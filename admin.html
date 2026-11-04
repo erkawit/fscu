@@ -196,18 +196,19 @@
         </div>
         <div class="grid lg:grid-cols-3 gap-4">
           <div class="card p-5 lg:col-span-2"><h3 class="h2 text-base mb-3">คะแนนเฉลี่ยรายส่วนงาน (เฉพาะที่มีผู้ประเมิน)</h3><div id="chUnitWrap"><canvas id="chUnit"></canvas></div></div>
-          <div class="card p-5"><h3 class="h2 text-base mb-3">ความคิดเห็นล่าสุด</h3><div id="latest" class="space-y-3"></div></div>
+          <div class="card p-5"><h3 class="h2 text-base mb-3">ปัญหาที่พบ / ความคิดเห็นล่าสุด</h3><div id="latest" class="space-y-3"></div></div>
         </div>
       </section>
 
       <!-- ===== RESPONSES ===== -->
       <section id="sec-responses" class="sec hidden space-y-4">
         <div class="card p-4 lg:p-5">
-          <div class="grid sm:grid-cols-2 xl:grid-cols-6 gap-3 items-end">
+          <div class="grid sm:grid-cols-2 xl:grid-cols-7 gap-3 items-end">
             <div><label class="lbl">ตั้งแต่วันที่</label><input type="date" id="rsFrom" class="inp"></div>
             <div><label class="lbl">ถึงวันที่</label><input type="date" id="rsTo" class="inp"></div>
             <div class="xl:col-span-2"><label class="lbl">ส่วนงาน</label><select id="rsUnit" class="inp"></select></div>
             <div><label class="lbl">คะแนน</label><select id="rsRate" class="inp"></select></div>
+            <div><label class="lbl">ปัญหาที่พบ</label><select id="rsProb" class="inp"><option value="">ทั้งหมด</option><option value="yes">มีการแจ้งปัญหา</option><option value="no">ไม่มีการแจ้งปัญหา</option></select></div>
             <button id="rsSearch" class="btn-pri">ค้นหา</button>
           </div>
           <div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-slate-100 items-center">
@@ -242,6 +243,7 @@
           </div>
           <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600">
             <label class="inline-flex items-center gap-2"><input type="checkbox" id="rpHideEmpty" class="rounded accent-navy-800">ซ่อนส่วนงานที่ไม่มีผู้ประเมิน</label>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" id="rpProblems" class="accent-navy-800" checked>แนบรายการปัญหาที่พบ</label>
             <label class="inline-flex items-center gap-2"><input type="checkbox" id="rpComments" class="accent-navy-800" checked>แนบรายการความคิดเห็นท้ายรายงาน</label>
             <label class="inline-flex items-center gap-2"><input type="checkbox" id="rpSign" class="accent-navy-800" checked>มีช่องลงนามท้ายรายงาน</label>
           </div>
@@ -363,7 +365,7 @@ function stats(rows) {
   const dist = [0, 0, 0, 0, 0]; let sum = 0, n = 0;
   rows.forEach(r => { if (r.rating >= 1 && r.rating <= 5) { dist[r.rating - 1]++; sum += r.rating; n++; } });
   const avg = n ? sum / n : 0;
-  return { n, avg, pct: avg * 20, dist, level: n ? levelOf(avg) : '-' };
+  return { n, avg, pct: avg * 20, dist, level: n ? levelOf(avg) : '-', pr: rows.filter(r => r.problem).length };
 }
 
 const S = { token: null, user: null, charts: {}, dt: null, rows: [], report: null, inited: {} };
@@ -506,7 +508,7 @@ function renderDashboard(rows, y) {
   const td = stats(rows.filter(r => r.ts.slice(0, 10) === t));
   const lv = st.n ? levelIdx(st.avg) : -1;
   $('#dashKpis').innerHTML =
-    kpi('ผู้ประเมินทั้งหมด', nf(st.n), 'ราย ตลอดปี พ.ศ. ' + (y + 543), '#1b2748') +
+    kpi('ผู้ประเมินทั้งหมด', nf(st.n), 'ราย ปี พ.ศ. ' + (y + 543) + ' · แจ้งปัญหา ' + nf(st.pr) + ' ราย', '#1b2748') +
     kpi('คะแนนเฉลี่ย', st.n ? f2(st.avg) : '-', st.n ? `<span style="color:${LV_COLORS[lv]}" class="font-semibold">ระดับ${st.level}</span> (เต็ม 5)` : 'ยังไม่มีข้อมูล', '#c69a2b') +
     kpi('ร้อยละความพึงพอใจ', st.n ? f2(st.pct) + '%' : '-', 'คำนวณจาก ค่าเฉลี่ย × 20', '#059669') +
     kpi('วันนี้', nf(td.n), td.n ? 'ราย · เฉลี่ย ' + f2(td.avg) : 'ยังไม่มีผู้ประเมินวันนี้', '#3d5288');
@@ -541,12 +543,13 @@ function renderDashboard(rows, y) {
       plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` เฉลี่ย ${f2(c.raw)} จาก ${nf(units[c.dataIndex].n)} ราย` } } } }
   });
 
-  const latest = rows.filter(r => r.comment).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
+  const latest = rows.filter(r => r.comment || r.problem).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
   $('#latest').innerHTML = latest.length ? latest.map(r => `
     <div class="border-l-4 pl-3 py-0.5" style="border-color:${LV_COLORS[r.rating - 1] || '#cbd5e1'}">
-      <p class="text-[15px] line-clamp-3">${esc(r.comment)}</p>
+      ${r.problem ? `<p class="text-[15px] line-clamp-3 text-red-700"><span class="badge bg-red-50 text-red-700 mr-1">ปัญหา</span>${esc(r.problem)}</p>` : ''}
+      ${r.comment ? `<p class="text-[15px] line-clamp-3">${esc(r.comment)}</p>` : ''}
       <p class="text-xs text-slate-500 mt-1">${esc(unitLabel(r))} · ${thDateTime(r.ts)}</p>
-    </div>`).join('') : '<p class="text-slate-400 text-sm">ยังไม่มีความคิดเห็น</p>';
+    </div>`).join('') : '<p class="text-slate-400 text-sm">ยังไม่มีความคิดเห็นหรือปัญหาที่แจ้ง</p>';
 }
 
 function drawChart(id, cfg) {
@@ -604,6 +607,7 @@ function initResponses() {
       { data: 'age', title: 'ช่วงอายุ', render: DataTable.render.text() },
       { data: 'gender', title: 'เพศ', render: DataTable.render.text() },
       { data: 'rating', title: 'คะแนน', className: 'dt-center', render: (v, t) => t === 'display' ? starsHtml(v) : v },
+      { data: 'problem', title: 'ปัญหาที่พบ', render: (v, t) => t === 'display' ? (v ? `<span class="line-clamp-2 min-w-[160px] text-red-700">${esc(v)}</span>` : '<span class="text-slate-300">–</span>') : v },
       { data: 'comment', title: 'ความคิดเห็น', render: (v, t) => t === 'display' ? (v ? `<span class="line-clamp-2 min-w-[180px]">${esc(v)}</span>` : '<span class="text-slate-300">–</span>') : v },
       { data: null, title: '', orderable: false, searchable: false, className: 'dt-center', render: () => '<button class="btn-out btn-sm js-detail whitespace-nowrap">รายละเอียด</button>' }
     ]
@@ -619,6 +623,7 @@ function initResponses() {
   $('#rsSearch').addEventListener('click', loadResponses);
   $('#rsUnit').addEventListener('change', applyRsFilter);
   $('#rsRate').addEventListener('change', applyRsFilter);
+  $('#rsProb').addEventListener('change', applyRsFilter);
   $('#rsPdf').addEventListener('click', () => printResponsesPdf().catch(pdfFail));
   $('#rsCsv').addEventListener('click', exportCsv);
   loadResponses();
@@ -630,14 +635,14 @@ async function loadResponses() {
   try { S.rows = await api('responses', { from, to }); applyRsFilter(); } catch (e) { alertErr(e); }
 }
 function applyRsFilter() {
-  const u = $('#rsUnit').value, rt = $('#rsRate').value;
-  const rows = S.rows.filter(r => (!u || r.unit === u) && (!rt || r.rating === +rt));
+  const u = $('#rsUnit').value, rt = $('#rsRate').value, pb = $('#rsProb').value;
+  const rows = S.rows.filter(r => (!u || r.unit === u) && (!rt || r.rating === +rt) && (!pb || (pb === 'yes') === !!r.problem));
   S.dt.clear().rows.add(rows).draw();
 }
 function shownRows() { return S.dt ? S.dt.rows({ search: 'applied', order: 'applied' }).data().toArray() : []; }
 function updateRsInfo() {
   const st = stats(shownRows());
-  $('#rsInfo').innerHTML = st.n ? `แสดง <b>${nf(st.n)}</b> รายการ · คะแนนเฉลี่ย <b>${f2(st.avg)}</b> (${st.level}) · ร้อยละ ${f2(st.pct)}` : 'ไม่มีรายการ';
+  $('#rsInfo').innerHTML = st.n ? `แสดง <b>${nf(st.n)}</b> รายการ · คะแนนเฉลี่ย <b>${f2(st.avg)}</b> (${st.level}) · ร้อยละ ${f2(st.pct)} · แจ้งปัญหา <b>${nf(st.pr)}</b> ราย` : 'ไม่มีรายการ';
 }
 
 function detailHtml(r) {
@@ -651,6 +656,7 @@ function detailHtml(r) {
     ${r.sub ? row('งานที่รับบริการ', esc(r.sub)) : ''}
     ${r.other ? row('ระบุ (อื่นๆ)', esc(r.other)) : ''}
     ${row('ความพึงพอใจ', `<span style="color:#f59e0b" class="text-xl">${'★'.repeat(r.rating)}</span><span class="text-slate-300 text-xl">${'★'.repeat(5 - r.rating)}</span> <b>${r.rating}</b> · <span style="color:${LV_COLORS[r.rating - 1]}" class="font-semibold">${esc(LEVELS[r.rating - 1] || r.level)}</span>`)}
+    ${row('ปัญหาที่พบ', r.problem ? `<div class="whitespace-pre-wrap bg-red-50 text-red-800 rounded-lg p-3">${esc(r.problem)}</div>` : '<span class="text-slate-400">ไม่ได้แจ้งปัญหา</span>')}
     ${row('ความคิดเห็น', r.comment ? `<div class="whitespace-pre-wrap bg-slate-50 rounded-lg p-3">${esc(r.comment)}</div>` : '<span class="text-slate-400">ไม่ได้แสดงความคิดเห็น</span>')}
   </table>`;
 }
@@ -680,8 +686,8 @@ function exportCsv() {
   const rows = shownRows();
   if (!rows.length) return toast('info', 'ไม่มีข้อมูลให้ส่งออก');
   const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-  const head = ['ลำดับ', 'รหัส', 'วันที่-เวลา', 'ช่วงอายุ', 'เพศ', 'ส่วนงาน', 'งานย่อย', 'ระบุ (อื่นๆ)', 'คะแนน', 'ระดับ', 'ความคิดเห็น'];
-  const lines = [head.map(q).join(',')].concat(rows.map((r, i) => [i + 1, r.id, r.ts, r.age, r.gender, r.unit, r.sub, r.other, r.rating, LEVELS[r.rating - 1] || r.level, r.comment].map(q).join(',')));
+  const head = ['ลำดับ', 'รหัส', 'วันที่-เวลา', 'ช่วงอายุ', 'เพศ', 'ส่วนงาน', 'งานย่อย', 'ระบุ (อื่นๆ)', 'คะแนน', 'ระดับ', 'ปัญหาที่พบ', 'ความคิดเห็น'];
+  const lines = [head.map(q).join(',')].concat(rows.map((r, i) => [i + 1, r.id, r.ts, r.age, r.gender, r.unit, r.sub, r.other, r.rating, LEVELS[r.rating - 1] || r.level, r.problem, r.comment].map(q).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `แบบสอบถามความพึงพอใจ_${$('#rsFrom').value || 'all'}_${$('#rsTo').value || ''}.csv`;
@@ -788,7 +794,8 @@ const kpiItems = st => [
   ['จำนวนผู้ประเมิน', nf(st.n) + ' ราย'],
   ['คะแนนเฉลี่ย (เต็ม 5)', st.n ? f2(st.avg) : '-'],
   ['ร้อยละความพึงพอใจ', st.n ? f2(st.pct) + '%' : '-'],
-  ['ระดับความพึงพอใจ', st.level]
+  ['ระดับความพึงพอใจ', st.level],
+  ['ผู้แจ้งปัญหาที่พบ', nf(st.pr) + ' ราย']
 ];
 
 async function printResponsesPdf() {
@@ -809,10 +816,10 @@ async function printResponsesPdf() {
       pTitle('รายการความคิดเห็นแบบสอบถามความพึงพอใจในการให้บริการ', B.org, filt),
       pKpis(kpiItems(st)),
       { type: 'table', title: '', columns: [
-          { label: 'ลำดับ', w: '46px', a: 'c' }, { label: 'วันที่-เวลา', w: '118px', a: 'c' }, { label: 'ส่วนงานที่รับบริการ', w: '210px' },
-          { label: 'ช่วงอายุ', w: '82px', a: 'c' }, { label: 'เพศ', w: '62px', a: 'c' }, { label: 'คะแนน', w: '92px', a: 'c' }, { label: 'ความคิดเห็น/ข้อเสนอแนะ' }],
+          { label: 'ลำดับ', w: '42px', a: 'c' }, { label: 'วันที่-เวลา', w: '108px', a: 'c' }, { label: 'ส่วนงานที่รับบริการ', w: '170px' },
+          { label: 'ช่วงอายุ', w: '72px', a: 'c' }, { label: 'เพศ', w: '58px', a: 'c' }, { label: 'คะแนน', w: '88px', a: 'c' }, { label: 'ปัญหาที่พบ' }, { label: 'ความคิดเห็นเกี่ยวกับการบริการ' }],
         rows: rows.map((r, i) => [i + 1, thDateTime(r.ts), esc(unitLabel(r)), esc(r.age), esc(r.gender),
-          `${pStars(r.rating)}<br>${r.rating} · ${esc(LEVELS[r.rating - 1] || '')}`, r.comment ? esc(r.comment) : '-']) }
+          `${pStars(r.rating)}<br>${r.rating} · ${esc(LEVELS[r.rating - 1] || '')}`, r.problem ? esc(r.problem) : '-', r.comment ? esc(r.comment) : '-']) }
     ]
   });
 }
@@ -829,7 +836,8 @@ async function printSinglePdf(r) {
         tr('ช่วงอายุ', esc(r.age)), tr('เพศ', esc(r.gender)), tr('ส่วนงาน', esc(r.unit)),
         r.sub ? tr('งานที่รับบริการ', esc(r.sub)) : null, r.other ? tr('ระบุ (อื่นๆ)', esc(r.other)) : null,
         tr('ระดับความพึงพอใจ', `${pStars(r.rating)}  ${r.rating} คะแนน · ${esc(LEVELS[r.rating - 1] || '')}`),
-        tr('ความคิดเห็น/ข้อเสนอแนะ', r.comment ? esc(r.comment) : '-')
+        tr('ปัญหาที่พบ', r.problem ? esc(r.problem) : '-'),
+        tr('ความคิดเห็นเกี่ยวกับการบริการ', r.comment ? esc(r.comment) : '-')
       ].filter(Boolean) }
     ]
   });
@@ -892,7 +900,7 @@ function reportModel() {
   const { rg, rows } = S.report;
   const hide = $('#rpHideEmpty').checked;
   const st = stats(rows);
-  const cells = (name, s) => [name, nf(s.n), ...[4, 3, 2, 1, 0].map(i => s.n ? nf(s.dist[i]) : '-'), s.n ? f2(s.avg) : '-', s.n ? f2(s.pct) : '-', s.n ? s.level : '-'];
+  const cells = (name, s) => [name, nf(s.n), s.n ? nf(s.pr) : '-', ...[4, 3, 2, 1, 0].map(i => s.n ? nf(s.dist[i]) : '-'), s.n ? f2(s.avg) : '-', s.n ? f2(s.pct) : '-', s.n ? s.level : '-'];
   const unitRows = [];
   groupUnits(rows).forEach(u => {
     if (hide && !u.n) return;
@@ -930,17 +938,19 @@ function reportModel() {
     genderRows: simple(B.genders, 'gender'),
     ageRows: simple(B.ages, 'age'),
     unitRows, timeRows,
-    comments: rows.filter(r => r.comment).sort((a, b) => a.ts.localeCompare(b.ts))
+    comments: rows.filter(r => r.comment).sort((a, b) => a.ts.localeCompare(b.ts)),
+    problems: rows.filter(r => r.problem).sort((a, b) => a.ts.localeCompare(b.ts))
   };
 }
 
 const UNIT_COLS = [
-  { label: 'ส่วนงาน / งานที่ให้บริการ', w: '300px' }, { label: 'จำนวน<br>(ราย)', a: 'c' },
+  { label: 'ส่วนงาน / งานที่ให้บริการ', w: '280px' }, { label: 'จำนวน<br>(ราย)', a: 'c' }, { label: 'แจ้งปัญหา<br>(ราย)', a: 'c' },
   { label: 'ดีเยี่ยม<br>(5)', a: 'c' }, { label: 'ดี<br>(4)', a: 'c' }, { label: 'ปานกลาง<br>(3)', a: 'c' }, { label: 'พอใช้<br>(2)', a: 'c' }, { label: 'ปรับปรุง<br>(1)', a: 'c' },
   { label: 'ค่าเฉลี่ย', a: 'c' }, { label: 'ร้อยละ', a: 'c' }, { label: 'ระดับ', a: 'c', w: '90px' }];
 const TIME_COLS = [{ label: 'ช่วงเวลา', w: '40%' }, { label: 'จำนวน (ราย)', a: 'c' }, { label: 'ค่าเฉลี่ย', a: 'c' }, { label: 'ร้อยละ', a: 'c' }, { label: 'ระดับ', a: 'c' }];
-const COMMENT_COLS = [{ label: 'ลำดับ', w: '46px', a: 'c' }, { label: 'วันที่-เวลา', w: '118px', a: 'c' }, { label: 'ส่วนงานที่รับบริการ', w: '230px' }, { label: 'คะแนน', w: '92px', a: 'c' }, { label: 'ความคิดเห็น/ข้อเสนอแนะ' }];
-const commentRows = list => list.map((r, i) => [i + 1, thDateTime(r.ts), esc(unitLabel(r)), `${pStars(r.rating)}<br>${r.rating} · ${esc(LEVELS[r.rating - 1] || '')}`, esc(r.comment)]);
+const COMMENT_COLS = [{ label: 'ลำดับ', w: '46px', a: 'c' }, { label: 'วันที่-เวลา', w: '118px', a: 'c' }, { label: 'ส่วนงานที่รับบริการ', w: '230px' }, { label: 'คะแนน', w: '92px', a: 'c' }, { label: 'ความคิดเห็นเกี่ยวกับการบริการ' }];
+const PROBLEM_COLS = COMMENT_COLS.slice(0, 4).concat([{ label: 'ปัญหาที่พบ' }]);
+const commentRows = (list, f = 'comment') => list.map((r, i) => [i + 1, thDateTime(r.ts), esc(unitLabel(r)), `${pStars(r.rating)}<br>${r.rating} · ${esc(LEVELS[r.rating - 1] || '')}`, esc(r[f])]);
 const miniTbl = (title, head, rows) => `<div><h3 class="rp-h">${title}</h3><table class="rp-tbl"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i ? 'c' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 
 function htmlTable(cols, rows) {
@@ -960,11 +970,12 @@ function renderReport() {
       <h2 class="font-head text-xl font-semibold text-navy-800">รายงานผลการประเมินความพึงพอใจในการให้บริการ</h2>
       <p class="text-slate-600">${esc(B.org)}</p><p class="text-gold-600 font-medium">${esc(rg.period)}</p>
     </div>
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
       ${kpi('จำนวนผู้ประเมิน', nf(st.n), 'ราย', '#1b2748')}
       ${kpi('คะแนนเฉลี่ย', st.n ? f2(st.avg) : '-', 'เต็ม 5 คะแนน', '#c69a2b')}
       ${kpi('ร้อยละความพึงพอใจ', st.n ? f2(st.pct) + '%' : '-', 'ค่าเฉลี่ย × 20', '#059669')}
       ${kpi('ระดับความพึงพอใจ', `<span style="color:${LV_COLORS[lv] || '#94a3b8'}">${st.level}</span>`, '&nbsp;', LV_COLORS[lv] || '#94a3b8')}
+      ${kpi('ผู้แจ้งปัญหาที่พบ', nf(st.pr), st.n ? 'ราย · ' + f2(st.pr / st.n * 100) + '% ของผู้ประเมิน' : 'ราย', '#dc2626')}
     </div>
     ${st.n ? '' : '<div class="rounded-xl bg-amber-50 text-amber-800 p-4 text-center">ไม่มีผู้ประเมินในช่วงเวลานี้</div>'}
     <div class="grid lg:grid-cols-3 gap-4">
@@ -974,7 +985,9 @@ function renderReport() {
     </div>
     <div><h3 class="h2 text-base mb-2">ผลการประเมินจำแนกตามส่วนงาน</h3>${htmlTable(UNIT_COLS, M.unitRows)}</div>
     ${M.timeRows.length ? `<div><h3 class="h2 text-base mb-2">${M.timeTitle}</h3>${htmlTable(TIME_COLS, M.timeRows)}</div>` : ''}
-    <div><h3 class="h2 text-base mb-2">ความคิดเห็น/ข้อเสนอแนะ (${nf(M.comments.length)} รายการ)</h3>
+    <div><h3 class="h2 text-base mb-2">ปัญหาที่พบ (${nf(M.problems.length)} รายการ)</h3>
+      ${M.problems.length ? htmlTable(PROBLEM_COLS, commentRows(M.problems, 'problem')) : '<p class="text-slate-400">ไม่มีการแจ้งปัญหาในช่วงเวลานี้</p>'}</div>
+    <div><h3 class="h2 text-base mb-2">ความคิดเห็นเกี่ยวกับการบริการ (${nf(M.comments.length)} รายการ)</h3>
       ${M.comments.length ? htmlTable(COMMENT_COLS, commentRows(M.comments)) : '<p class="text-slate-400">ไม่มีความคิดเห็นในช่วงเวลานี้</p>'}</div>
     <p class="text-xs text-slate-500">เกณฑ์การแปลผล: 4.51–5.00 ดีเยี่ยม · 3.51–4.50 ดี · 2.51–3.50 ปานกลาง · 1.51–2.50 พอใช้ · 1.00–1.50 ปรับปรุง · ร้อยละความพึงพอใจ = ค่าเฉลี่ย × 20</p>
   </div>`;
@@ -995,7 +1008,8 @@ async function printReportPdf() {
     { type: 'table', title: 'ผลการประเมินจำแนกตามส่วนงาน', columns: UNIT_COLS, rows: M.unitRows },
     M.timeRows.length ? { type: 'table', title: M.timeTitle, columns: TIME_COLS, rows: M.timeRows } : null,
     { html: '<p style="font-size:11.5px;color:#6b7280;margin:0 0 10px">เกณฑ์การแปลผล: 4.51–5.00 ดีเยี่ยม · 3.51–4.50 ดี · 2.51–3.50 ปานกลาง · 1.51–2.50 พอใช้ · 1.00–1.50 ปรับปรุง · ร้อยละความพึงพอใจ = ค่าเฉลี่ย × 20</p>' },
-    $('#rpComments').checked && M.comments.length ? { type: 'table', title: `ความคิดเห็น/ข้อเสนอแนะของผู้รับบริการ (${nf(M.comments.length)} รายการ)`, columns: COMMENT_COLS, rows: commentRows(M.comments) } : null,
+    $('#rpProblems').checked && M.problems.length ? { type: 'table', title: `ปัญหาที่พบจากผู้รับบริการ (${nf(M.problems.length)} รายการ)`, columns: PROBLEM_COLS, rows: commentRows(M.problems, 'problem') } : null,
+    $('#rpComments').checked && M.comments.length ? { type: 'table', title: `ความคิดเห็นเกี่ยวกับการบริการ (${nf(M.comments.length)} รายการ)`, columns: COMMENT_COLS, rows: commentRows(M.comments) } : null,
     $('#rpSign').checked ? { html: `<div class="rp-sign">
       <div><p>ลงชื่อ ........................................................ ผู้จัดทำรายงาน</p><p>(........................................................)</p><p>ตำแหน่ง ........................................................</p></div>
       <div><p>ลงชื่อ ........................................................ ผู้ตรวจสอบ/อนุมัติ</p><p>(........................................................)</p><p>ตำแหน่ง ........................................................</p></div>

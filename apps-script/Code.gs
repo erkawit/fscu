@@ -55,7 +55,7 @@ const SERVICES = [
   ]
 );
 
-const RESP_HEADERS = ['รหัส', 'วันที่-เวลา', 'ช่วงอายุ', 'เพศ', 'ส่วนงาน', 'งานย่อย', 'ระบุ (อื่นๆ)', 'ความคิดเห็น/ข้อเสนอแนะ', 'คะแนน', 'ระดับความพึงพอใจ'];
+const RESP_HEADERS = ['รหัส', 'วันที่-เวลา', 'ช่วงอายุ', 'เพศ', 'ส่วนงาน', 'งานย่อย', 'ระบุ (อื่นๆ)', 'ความคิดเห็น/ข้อเสนอแนะ', 'คะแนน', 'ระดับความพึงพอใจ', 'ปัญหาที่พบ'];
 const USER_HEADERS = ['ชื่อผู้ใช้', 'ชื่อ-สกุล', 'ตำแหน่ง', 'สิทธิ์', 'สถานะ', 'Salt', 'PasswordHash', 'สร้างเมื่อ', 'เข้าระบบล่าสุด'];
 const LOG_HEADERS = ['วันที่-เวลา', 'ผู้ใช้', 'การกระทำ', 'รายละเอียด'];
 
@@ -159,6 +159,7 @@ function submitSurvey(f) {
       if (!other) throw new Error('กรุณาระบุงานที่รับบริการ');
     }
     const comment = clean_(f.comment, CONFIG.COMMENT_MAX);
+    const problem = clean_(f.problem, CONFIG.COMMENT_MAX);
     const rating = parseInt(f.rating, 10);
     if (!(rating >= 1 && rating <= 5)) throw new Error('กรุณาให้คะแนนความพึงพอใจ');
 
@@ -169,7 +170,7 @@ function submitSurvey(f) {
     lock.waitLock(15000);
     try {
       sheet_(CONFIG.SHEET_RESPONSES, RESP_HEADERS)
-        .appendRow([id, now, age, gender, unit.name, sub, other, comment, rating, RATING_LABELS[rating - 1]]);
+        .appendRow([id, now, age, gender, unit.name, sub, other, comment, rating, RATING_LABELS[rating - 1], problem]);
     } finally {
       lock.releaseLock();
     }
@@ -275,7 +276,7 @@ function readResponses_(from, to) {
     out.push({
       id: String(r[0]), ts: ts, age: String(r[2]), gender: String(r[3]),
       unit: String(r[4]), sub: String(r[5]), other: String(r[6]), comment: String(r[7]),
-      rating: Number(r[8]) || 0, level: String(r[9])
+      rating: Number(r[8]) || 0, level: String(r[9]), problem: String(r[10] == null ? '' : r[10])
     });
   }
   return out;
@@ -403,6 +404,11 @@ function sheet_(name, headers) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers])
       .setFontWeight('bold').setBackground('#1b2748').setFontColor('#ffffff');
     sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < headers.length) {
+    // เพิ่มหัวคอลัมน์ใหม่ต่อท้ายให้ชีตเดิม (ข้อมูลเก่าไม่เสีย)
+    const from = sh.getLastColumn() + 1;
+    sh.getRange(1, from, 1, headers.length - from + 1).setValues([headers.slice(from - 1)])
+      .setFontWeight('bold').setBackground('#1b2748').setFontColor('#ffffff');
   }
   return sh;
 }
