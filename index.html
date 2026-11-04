@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=Prompt:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: {
+      fontFamily: { sans: ['Sarabun', 'sans-serif'], head: ['Prompt', 'Sarabun', 'sans-serif'] },
+      colors: {
+        navy: { 50:'#f2f4f9',100:'#e3e8f2',200:'#c3cde2',500:'#3d5288',600:'#2c3d68',700:'#22305a',800:'#1b2748',900:'#141d36' },
+        gold: { 50:'#fcf8ec',100:'#f8f0d6',300:'#e6cc7a',400:'#d9b54e',500:'#c69a2b',600:'#a37c1d' }
+      }
+    } } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <title>แบบสอบถามความพึงพอใจในการให้บริการ ศาลจังหวัดอุดรธานี</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style type="text/tailwindcss">
+    .qcard { @apply bg-white rounded-2xl shadow-sm ring-1 ring-slate-200 p-5 sm:p-7 transition; }
+    .qcard.invalid { @apply ring-2 ring-red-400; }
+    .qh { @apply font-head text-[17px] sm:text-lg font-semibold text-navy-800 flex items-start gap-3; }
+    .num { @apply w-8 h-8 rounded-full bg-navy-800 text-gold-300 grid place-items-center text-sm shrink-0 -mt-0.5; }
+    .req { @apply text-red-600; }
+    .err { @apply mt-3 text-sm text-red-600 hidden; }
+    .qcard.invalid .err { @apply block; }
+
+    .opt { @apply block cursor-pointer; }
+    .opt > span { @apply flex items-center justify-center gap-2 h-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-center text-[15px] transition hover:border-navy-500 hover:bg-navy-50; }
+    .opt input:checked + span { @apply border-navy-700 bg-navy-700 text-white shadow-md; }
+    .opt input:focus-visible + span, .unit input:focus-visible + span, .chip input:focus-visible + span { @apply ring-2 ring-gold-400 ring-offset-2; }
+
+    .unit { @apply block cursor-pointer; }
+    .unit > span { @apply flex items-start gap-3 rounded-xl border border-slate-300 bg-white px-4 py-3 transition hover:border-navy-500 hover:bg-navy-50; }
+    .unit input:checked + span { @apply border-navy-700 bg-navy-50 ring-1 ring-navy-700; }
+    .dot { @apply mt-1 w-[18px] h-[18px] rounded-full border-2 border-slate-400 shrink-0 transition; }
+    .unit input:checked + span .dot { @apply border-navy-700 bg-navy-700 shadow-[inset_0_0_0_3px_#fff]; }
+
+    .chip { @apply cursor-pointer; }
+    .chip > span { @apply inline-flex items-center rounded-full border border-slate-300 bg-white px-4 py-1.5 text-[15px] transition hover:border-gold-500; }
+    .chip input:checked + span { @apply border-gold-500 bg-gold-100 text-navy-900 font-semibold; }
+
+    .grp { @apply text-xs font-semibold tracking-wider text-gold-600 uppercase mt-5 mb-2 first:mt-0; }
+
+    .star { @apply flex flex-col items-center gap-1.5 rounded-xl py-2 select-none outline-none focus-visible:ring-2 focus-visible:ring-gold-400; }
+    .star svg { @apply w-11 h-11 sm:w-14 sm:h-14 text-slate-300 transition duration-150; }
+    .star.on svg { @apply text-amber-400 drop-shadow; }
+    .star:hover svg { @apply scale-110; }
+    .star .lb { @apply text-[13px] sm:text-sm text-slate-500 transition; }
+    .star.sel .lb { @apply text-navy-800 font-bold; }
+  </style>
+</head>
+<body class="bg-[#f4f2ec] text-slate-800 font-sans antialiased min-h-screen">
+
+<header class="bg-navy-800 text-white relative overflow-hidden">
+  <svg class="absolute -right-10 -top-10 w-64 h-64 text-white/[0.04]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.5 3H19l-3 6a3.5 3.5 0 0 0 6 0l-3-6h.01M12 2l-1.5 3H5l3 6a3.5 3.5 0 0 1-6 0l3-6M12 2v18m-5 2h10"/></svg>
+  <div class="absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r from-gold-600 via-gold-300 to-gold-600"></div>
+  <div class="relative max-w-3xl mx-auto px-4 py-6 sm:py-9 flex items-center gap-4">
+    <div class="shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/10 ring-2 ring-gold-400/70 grid place-items-center">
+      <svg class="w-8 h-8 sm:w-9 sm:h-9 text-gold-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v17M7 20h10M5 7h14M12 3l-1 4M12 3l1 4"/><path d="M5 7l-3 6a3 3 0 0 0 6 0L5 7zM19 7l-3 6a3 3 0 0 0 6 0l-3-6z"/></svg>
+    </div>
+    <div>
+      <p id="orgName" class="text-gold-300 text-sm sm:text-base font-medium"></p>
+      <h1 class="font-head text-xl sm:text-[26px] font-semibold leading-snug">แบบสอบถามความพึงพอใจในการให้บริการ</h1>
+      <p class="text-white/70 text-sm mt-1">ใช้เวลาประมาณ 1 นาที · ไม่ต้องระบุชื่อ ข้อมูลใช้เพื่อพัฒนาการให้บริการเท่านั้น</p>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+  <div id="loading" class="py-24 text-center text-slate-500">
+    <div class="w-10 h-10 mx-auto border-4 border-slate-200 border-t-navy-700 rounded-full animate-spin"></div>
+    <p class="mt-4" id="loadingMsg">กำลังโหลดแบบสอบถาม...</p>
+    <button id="btnRetry" class="hidden mt-4 rounded-xl bg-navy-800 text-white px-5 py-2.5">ลองใหม่</button>
+  </div>
+  <form id="f" novalidate class="space-y-5 hidden">
+    <input type="text" name="website" id="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true">
+
+    <section class="qcard" data-q="age">
+      <h2 class="qh"><span class="num">1</span><span>ช่วงอายุ <span class="req">*</span></span></h2>
+      <div id="ages" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4"></div>
+      <p class="err">กรุณาเลือกช่วงอายุ</p>
+    </section>
+
+    <section class="qcard" data-q="gender">
+      <h2 class="qh"><span class="num">2</span><span>เพศ <span class="req">*</span></span></h2>
+      <div id="genders" class="grid grid-cols-3 gap-2.5 mt-4"></div>
+      <p class="err">กรุณาเลือกเพศ</p>
+    </section>
+
+    <section class="qcard" data-q="unit">
+      <h2 class="qh"><span class="num">3</span><span>งานที่ท่านมารับบริการ <span class="req">*</span></span></h2>
+      <div id="units" class="mt-4"></div>
+      <p class="err" id="unitErr">กรุณาเลือกงานที่รับบริการ</p>
+    </section>
+
+    <section class="qcard" data-q="comment">
+      <h2 class="qh"><span class="num">4</span><span>โปรดแนะนำความเห็นเกี่ยวกับการบริการ <span class="text-slate-400 font-sans font-normal text-sm">(ไม่บังคับ)</span></span></h2>
+      <textarea id="comment" rows="4" class="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3 text-[15px] focus:border-navy-600 focus:ring-2 focus:ring-navy-100 outline-none resize-y" placeholder="ความประทับใจ ข้อเสนอแนะ หรือสิ่งที่ควรปรับปรุง"></textarea>
+      <p class="text-right text-xs text-slate-400 mt-1"><span id="cc">0</span> / <span id="cmax"></span></p>
+    </section>
+
+    <section class="qcard" data-q="rating">
+      <h2 class="qh"><span class="num">5</span><span>ระดับความพึงพอใจในการให้บริการ <span class="req">*</span></span></h2>
+      <div id="stars" class="grid grid-cols-5 gap-1 sm:gap-3 max-w-lg mx-auto mt-5" role="radiogroup" aria-label="ระดับความพึงพอใจ"></div>
+      <p id="rateText" class="text-center mt-3 text-slate-400 text-[15px]">แตะที่ดาวเพื่อให้คะแนน</p>
+      <p class="err text-center">กรุณาให้คะแนนความพึงพอใจ</p>
+    </section>
+
+    <div class="pt-2">
+      <button id="btnSubmit" type="submit" class="w-full rounded-2xl bg-navy-800 hover:bg-navy-900 text-white font-head text-lg py-4 shadow-lg shadow-navy-900/20 transition disabled:opacity-60 flex items-center justify-center gap-3">
+        <span id="btnText">ส่งแบบสอบถาม</span>
+      </button>
+      <p class="text-center text-xs text-slate-500 mt-3">ระบบจะบันทึกวันที่และเวลาโดยอัตโนมัติ</p>
+    </div>
+  </form>
+
+  <section id="thanks" class="hidden qcard text-center py-12">
+    <div class="mx-auto w-20 h-20 rounded-full bg-emerald-50 ring-8 ring-emerald-50/60 grid place-items-center">
+      <svg class="w-11 h-11 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+    </div>
+    <h2 class="font-head text-2xl font-semibold text-navy-800 mt-6">ขอบคุณที่ร่วมตอบแบบสอบถาม</h2>
+    <p class="text-slate-600 mt-2">ความคิดเห็นของท่านจะนำไปพัฒนาการให้บริการของ<span class="orgName2"></span></p>
+    <button id="btnAgain" type="button" class="mt-8 rounded-xl bg-navy-800 text-white px-6 py-3 font-medium hover:bg-navy-900">ทำแบบสอบถามอีกครั้ง</button>
+    <p class="text-xs text-slate-400 mt-4">หน้าจอจะกลับสู่แบบสอบถามใหม่ใน <span id="countdown">20</span> วินาที</p>
+  </section>
+
+  <footer class="text-center text-xs text-slate-500 mt-10 pb-4">
+    © <span class="orgName2"></span> · <a id="adminLink" href="/admin" class="hover:text-navy-700 underline-offset-2 hover:underline">สำหรับเจ้าหน้าที่</a>
+  </footer>
+</main>
+
+<script>
+async function start() {
+  const $l = document.getElementById('loadingMsg'), $r = document.getElementById('btnRetry');
+  $r.classList.add('hidden'); $l.textContent = 'กำลังโหลดแบบสอบถาม...';
+  try {
+    const r = await callApi('config');
+    if (!r.ok) throw new Error(r.error);
+    const boot = r.data;
+    boot.presetUnit = (new URLSearchParams(location.search).get('unit') || '').slice(0, 10);
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('f').classList.remove('hidden');
+    init(boot);
+  } catch (e) {
+    $l.textContent = e.message; $r.classList.remove('hidden');
+  }
+}
+document.getElementById('btnRetry').addEventListener('click', start);
+start();
+
+function init(BOOT) {
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const STAR = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8l2.85 5.78 6.38.93-4.62 4.5 1.09 6.35L12 17.36l-5.7 3 1.09-6.35-4.62-4.5 6.38-.93z"/></svg>';
+  const LEVEL_COLOR = ['text-red-600', 'text-orange-500', 'text-amber-500', 'text-lime-600', 'text-emerald-600'];
+  let rating = 0, timer = null;
+
+  $('#orgName').textContent = BOOT.org;
+  $$('.orgName2').forEach(e => e.textContent = BOOT.org);
+  $('#cmax').textContent = BOOT.commentMax;
+  $('#comment').maxLength = BOOT.commentMax;
+
+  /* ---------- สร้างตัวเลือก ---------- */
+  const opt = (name, v) => `<label class="opt"><input type="radio" name="${name}" value="${esc(v)}" class="sr-only"><span>${esc(v)}</span></label>`;
+  $('#ages').innerHTML = BOOT.ages.map(a => opt('age', a)).join('');
+  $('#genders').innerHTML = BOOT.genders.map(g => opt('gender', g)).join('');
+
+  const unitCard = u => {
+    let panel = '';
+    if (u.subs.length) {
+      panel = `<div class="sub hidden pl-8 pt-3 pb-1" data-for="${u.id}">
+        <p class="text-sm text-navy-700 mb-2">โปรดเลือกงานที่รับบริการ <span class="req">*</span></p>
+        <div class="flex flex-wrap gap-2">${u.subs.map(s => `<label class="chip"><input type="radio" name="sub_${u.id}" value="${esc(s)}" class="sr-only"><span>${esc(s)}</span></label>`).join('')}</div></div>`;
+    } else if (u.other) {
+      panel = `<div class="sub hidden pl-8 pt-3" data-for="${u.id}">
+        <input id="otherText" maxlength="150" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-[15px] focus:border-navy-600 focus:ring-2 focus:ring-navy-100 outline-none" placeholder="โปรดระบุงานที่รับบริการ"></div>`;
+    }
+    return `<div><label class="unit"><input type="radio" name="unit" value="${u.id}" class="sr-only"><span><i class="dot"></i><span class="flex-1 min-w-0">
+      <span class="block font-medium text-[15px]">${esc(u.name)}</span>
+      ${u.subs.length ? `<span class="block text-sm text-slate-500 mt-0.5">${u.subs.map(esc).join(' · ')}</span>` : ''}
+      </span></span></label>${panel}</div>`;
+  };
+  const by = g => BOOT.services.filter(s => s.group === g);
+  $('#units').innerHTML =
+    `<p class="grp">ส่วนงานบริการ</p><div class="space-y-2">${by('main').map(unitCard).join('')}</div>` +
+    `<p class="grp">ห้องพิจารณาคดี</p><div class="grid grid-cols-4 sm:grid-cols-6 gap-2">${by('room').map(u =>
+      `<label class="opt" title="${esc(u.name)}"><input type="radio" name="unit" value="${u.id}" class="sr-only"><span class="!flex-col !gap-0 !py-2"><span class="text-[11px] opacity-75">ห้องพิจารณาคดีที่</span><span class="text-xl font-semibold leading-tight">${esc(u.short)}</span></span></label>`).join('')}</div>` +
+    `<p class="grp">ส่วนงานสนับสนุน</p><div class="space-y-2">${by('support').map(unitCard).join('')}</div>` +
+    `<div class="mt-2">${by('other').map(unitCard).join('')}</div>`;
+
+  /* ---------- ดาว ---------- */
+  $('#stars').innerHTML = BOOT.ratingLabels.map((l, i) =>
+    `<button type="button" class="star" data-v="${i + 1}" role="radio" aria-checked="false" aria-label="${i + 1} ดาว ${esc(l)}">${STAR}<span class="lb">${esc(l)}</span></button>`).join('');
+  const paint = v => $$('.star').forEach(b => {
+    const n = +b.dataset.v;
+    b.classList.toggle('on', n <= v);
+    b.classList.toggle('sel', n === rating);
+    b.setAttribute('aria-checked', n === rating ? 'true' : 'false');
+  });
+  const showRateText = () => {
+    const t = $('#rateText');
+    t.className = 'text-center mt-3 text-[15px] ' + (rating ? 'font-semibold ' + LEVEL_COLOR[rating - 1] : 'text-slate-400');
+    t.textContent = rating ? `${rating} ดาว · ${BOOT.ratingLabels[rating - 1]}` : 'แตะที่ดาวเพื่อให้คะแนน';
+  };
+  $$('.star').forEach(b => {
+    b.addEventListener('mouseenter', () => paint(+b.dataset.v));
+    b.addEventListener('click', () => { rating = +b.dataset.v; paint(rating); showRateText(); clearErr('rating'); });
+  });
+  $('#stars').addEventListener('mouseleave', () => paint(rating));
+  $('#stars').addEventListener('keydown', e => {
+    if (!['ArrowRight', 'ArrowLeft'].includes(e.key)) return;
+    e.preventDefault();
+    rating = Math.min(5, Math.max(1, (rating || 0) + (e.key === 'ArrowRight' ? 1 : -1)));
+    paint(rating); showRateText(); clearErr('rating');
+    $(`.star[data-v="${rating}"]`).focus();
+  });
+
+  /* ---------- events ---------- */
+  const clearErr = q => $(`[data-q="${q}"]`).classList.remove('invalid');
+  document.addEventListener('change', e => {
+    const n = e.target.name || '';
+    if (n === 'age' || n === 'gender') clearErr(n);
+    if (n === 'unit') { onUnit(e.target.value); clearErr('unit'); }
+    if (n.startsWith('sub_')) clearErr('unit');
+  });
+  $('#comment').addEventListener('input', e => $('#cc').textContent = e.target.value.length);
+
+  function onUnit(id) {
+    $$('.sub').forEach(p => p.classList.toggle('hidden', p.dataset.for !== id));
+    const u = BOOT.services.find(s => s.id === id);
+    if (u && u.subs.length === 1) $(`input[name="sub_${id}"]`).checked = true;
+    if (u && u.other) setTimeout(() => $('#otherText').focus(), 50);
+  }
+
+  function collect() {
+    const v = n => ($(`input[name="${n}"]:checked`) || {}).value || '';
+    const unitId = v('unit');
+    return {
+      age: v('age'), gender: v('gender'), unitId,
+      sub: unitId ? v('sub_' + unitId) : '',
+      other: ($('#otherText') || {}).value || '',
+      comment: $('#comment').value.trim(),
+      rating, website: $('#website').value
+    };
+  }
+
+  function validate(d) {
+    const bad = [];
+    if (!d.age) bad.push('age');
+    if (!d.gender) bad.push('gender');
+    const u = BOOT.services.find(s => s.id === d.unitId);
+    const ue = $('#unitErr');
+    if (!u) { bad.push('unit'); ue.textContent = 'กรุณาเลือกงานที่รับบริการ'; }
+    else if (u.subs.length && !d.sub) { bad.push('unit'); ue.textContent = 'กรุณาเลือกงานย่อยของ ' + u.name; }
+    else if (u.other && !d.other.trim()) { bad.push('unit'); ue.textContent = 'กรุณาระบุงานที่รับบริการ'; }
+    if (!d.rating) bad.push('rating');
+    return bad;
+  }
+
+  $('#f').addEventListener('submit', e => {
+    e.preventDefault();
+    const d = collect();
+    const bad = validate(d);
+    $$('.qcard[data-q]').forEach(c => c.classList.toggle('invalid', bad.includes(c.dataset.q)));
+    if (bad.length) { $(`[data-q="${bad[0]}"]`).scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+
+    const btn = $('#btnSubmit');
+    btn.disabled = true;
+    $('#btnText').innerHTML = '<span class="inline-block w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin align-middle mr-2"></span>กำลังส่งข้อมูล...';
+    callApi('submit', d)
+      .then(r => { resetBtn(); r && r.ok ? showThanks() : fail(r && r.error); })
+      .catch(err => { resetBtn(); fail(err && err.message); });
+  });
+  const resetBtn = () => { $('#btnSubmit').disabled = false; $('#btnText').textContent = 'ส่งแบบสอบถาม'; };
+  const fail = msg => Swal.fire({ icon: 'error', title: 'ส่งข้อมูลไม่สำเร็จ', text: msg || 'กรุณาลองใหม่อีกครั้ง', confirmButtonColor: '#1b2748', confirmButtonText: 'ตกลง' });
+
+  function showThanks() {
+    $('#f').classList.add('hidden');
+    $('#thanks').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    let n = 20;
+    $('#countdown').textContent = n;
+    clearInterval(timer);
+    timer = setInterval(() => { n--; $('#countdown').textContent = n; if (n <= 0) resetForm(); }, 1000);
+  }
+
+  function resetForm() {
+    clearInterval(timer);
+    $('#f').reset();
+    rating = 0; paint(0); showRateText();
+    $('#cc').textContent = 0;
+    $$('.sub').forEach(p => p.classList.add('hidden'));
+    $$('.qcard').forEach(c => c.classList.remove('invalid'));
+    $('#thanks').classList.add('hidden');
+    $('#f').classList.remove('hidden');
+    applyPreset();
+    window.scrollTo({ top: 0 });
+  }
+  $('#btnAgain').addEventListener('click', resetForm);
+
+  function applyPreset() {
+    const id = BOOT.presetUnit;
+    const el = id && $(`input[name="unit"][value="${CSS.escape(id)}"]`);
+    if (el) { el.checked = true; onUnit(id); }
+  }
+  applyPreset();
+}
+</script>
+</body>
+</html>
